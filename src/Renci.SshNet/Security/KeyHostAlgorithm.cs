@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Renci.SshNet.Common;
+using Renci.SshNet.Security.Chaos.NaCl;
 
 namespace Renci.SshNet.Security
 {
@@ -82,7 +83,7 @@ namespace Renci.SshNet.Security
         private class SshKeyData : SshData
         {
             private byte[] _name;
-            private IList<byte[]> _keys;
+            private List<byte[]> _keys;
 
             public BigInteger[] Keys
             {
@@ -92,7 +93,7 @@ namespace Renci.SshNet.Security
                     for (var i = 0; i < _keys.Count; i++)
                     {
                         var key = _keys[i];
-                        keys[i] = key.ToBigInteger();
+                        keys[i] = key.ToBigInteger2();
                     }
                     return keys;
                 }
@@ -101,7 +102,11 @@ namespace Renci.SshNet.Security
                     _keys = new List<byte[]>(value.Length);
                     foreach (var key in value)
                     {
-                        _keys.Add(key.ToByteArray().Reverse());
+                        var keyData = key.ToByteArray().Reverse();
+                        if (Name == "ssh-ed25519")
+                            keyData = keyData.TrimLeadingZeros().Pad(Ed25519.PublicKeySizeInBytes);
+
+                        _keys.Add(keyData);
                     }
                 }
             }
