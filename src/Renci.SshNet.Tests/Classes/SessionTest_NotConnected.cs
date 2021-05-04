@@ -4,34 +4,27 @@ using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Renci.SshNet.Common;
+using Renci.SshNet.Connection;
 using Renci.SshNet.Messages.Transport;
+using Renci.SshNet.Tests.Common;
 
 namespace Renci.SshNet.Tests.Classes
 {
     [TestClass]
-    public class SessionTest_NotConnected
+    public class SessionTest_NotConnected : SessionTestBase
     {
         private ConnectionInfo _connectionInfo;
-        private IServiceFactory _serviceFactory;
         private Session _session;
 
-        [TestInitialize]
-        public void Setup()
-        {
-            Arrange();
-            Act();
-        }
-
-        protected void Arrange()
+        protected override void SetupData()
         {
             var serverEndPoint = new IPEndPoint(IPAddress.Loopback, 8122);
             _connectionInfo = CreateConnectionInfo(serverEndPoint, TimeSpan.FromSeconds(5));
-            _serviceFactory = new Mock<IServiceFactory>(MockBehavior.Strict).Object;
         }
 
-        protected void Act()
+        protected override void Act()
         {
-            _session = new Session(_connectionInfo, _serviceFactory);
+            _session = new Session(_connectionInfo, _serviceFactoryMock.Object, _socketFactoryMock.Object);
         }
 
         [TestMethod]
@@ -44,6 +37,18 @@ namespace Renci.SshNet.Tests.Classes
         public void ConnectionInfoShouldReturnConnectionInfoPassedThroughConstructor()
         {
             Assert.AreSame(_connectionInfo, _session.ConnectionInfo);
+        }
+
+        [TestMethod]
+        public void DisconnectShouldNotThrowException()
+        {
+            _session.Disconnect();
+        }
+
+        [TestMethod]
+        public void DisposeShouldNotThrowException()
+        {
+            _session.Dispose();
         }
 
         [TestMethod]
@@ -81,9 +86,9 @@ namespace Renci.SshNet.Tests.Classes
         }
 
         [TestMethod]
-        public void WaitOnHandle_WaitHandle_ShouldThrowArgumentNullExceptionWhenWaitHandleIsNull()
+        public void WaitOnHandle_WaitOnHandle_WaitHandle_ShouldThrowArgumentNullExceptionWhenWaitHandleIsNull()
         {
-            WaitHandle waitHandle = null;
+            const WaitHandle waitHandle = null;
 
             try
             {
@@ -98,9 +103,9 @@ namespace Renci.SshNet.Tests.Classes
         }
 
         [TestMethod]
-        public void WaitOnHandle_WaitHandleAndTimeout_ShouldThrowArgumentNullExceptionWhenWaitHandleIsNull()
+        public void WaitOnHandle_WaitOnHandle_WaitHandleAndTimeout_ShouldThrowArgumentNullExceptionWhenWaitHandleIsNull()
         {
-            WaitHandle waitHandle = null;
+            const WaitHandle waitHandle = null;
             var timeout = TimeSpan.FromMinutes(5);
 
             try
@@ -116,9 +121,33 @@ namespace Renci.SshNet.Tests.Classes
         }
 
         [TestMethod]
+        public void ISession_TryWait_WaitHandleAndTimeout_ShouldReturnDisconnected()
+        {
+            var session = (ISession) _session;
+            var waitHandle = new ManualResetEvent(false);
+
+            var result = session.TryWait(waitHandle, Session.InfiniteTimeSpan);
+
+            Assert.AreEqual(WaitResult.Disconnected, result);
+        }
+
+        [TestMethod]
+        public void ISession_TryWait_WaitHandleAndTimeoutAndException_ShouldReturnDisconnected()
+        {
+            var session = (ISession) _session;
+            var waitHandle = new ManualResetEvent(false);
+            Exception exception;
+
+            var result = session.TryWait(waitHandle, Session.InfiniteTimeSpan, out exception);
+
+            Assert.AreEqual(WaitResult.Disconnected, result);
+            Assert.IsNull(exception);
+        }
+
+        [TestMethod]
         public void ISession_ConnectionInfoShouldReturnConnectionInfoPassedThroughConstructor()
         {
-            var session = (ISession)_session;
+            var session = (ISession) _session;
             Assert.AreSame(_connectionInfo, session.ConnectionInfo);
         }
 
@@ -134,7 +163,7 @@ namespace Renci.SshNet.Tests.Classes
         [TestMethod]
         public void ISession_SendMessageShouldThrowShhConnectionException()
         {
-            var session = (ISession)_session;
+            var session = (ISession) _session;
 
             try
             {
@@ -152,7 +181,7 @@ namespace Renci.SshNet.Tests.Classes
         [TestMethod]
         public void ISession_TrySendMessageShouldReturnFalse()
         {
-            var session = (ISession)_session;
+            var session = (ISession) _session;
 
             var actual = session.TrySendMessage(new IgnoreMessage());
 
@@ -160,14 +189,32 @@ namespace Renci.SshNet.Tests.Classes
         }
 
         [TestMethod]
-        public void ISession_WaitOnHandleShouldThrowArgumentNullExceptionWhenWaitHandleIsNull()
+        public void ISession_WaitOnHandle_WaitHandle_ShouldThrowArgumentNullExceptionWhenWaitHandleIsNull()
         {
-            WaitHandle waitHandle = null;
-            var session = (ISession)_session;
+            const WaitHandle waitHandle = null;
+            var session = (ISession) _session;
 
             try
             {
                 session.WaitOnHandle(waitHandle);
+                Assert.Fail();
+            }
+            catch (ArgumentNullException ex)
+            {
+                Assert.IsNull(ex.InnerException);
+                Assert.AreEqual("waitHandle", ex.ParamName);
+            }
+        }
+
+        [TestMethod]
+        public void ISession_WaitOnHandle_WaitHandleAndTimeout_ShouldThrowArgumentNullExceptionWhenWaitHandleIsNull()
+        {
+            const WaitHandle waitHandle = null;
+            var session = (ISession) _session;
+
+            try
+            {
+                session.WaitOnHandle(waitHandle, Session.InfiniteTimeSpan);
                 Assert.Fail();
             }
             catch (ArgumentNullException ex)
